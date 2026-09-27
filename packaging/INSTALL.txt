@@ -1,0 +1,18 @@
+MUA Controller Fix
+Native Xbox controller support for Marvel: Ultimate Alliance 1 & 2 (2016 PC)
+https://github.com/ChronoRixun/mua-controller-fix
+
+INSTALL
+  Copy dinput8.dll into the game's folder - the one that contains the game's .exe:
+    Marvel: Ultimate Alliance    ...\steamapps\common\Marvel - Ultimate Alliance      (Marvel.exe)
+    Marvel: Ultimate Alliance 2  ...\steamapps\common\Marvel - Ultimate Alliance 2    (Alliance.exe)
+  Tip: in Steam, right-click the game > Manage > Browse local files.
+
+UNINSTALL
+  Delete dinput8.dll from the game folder.
+
+TROUBLESHOOTING
+  The fix writes mua-controller-fix.log next to itself each time the game starts.
+  If something is wrong, open an issue on GitHub and attach that file.
+
+MIT License - see LICENSE. Not affiliated with or endorsed by Activision, Marvel, Disney or Microsoft.

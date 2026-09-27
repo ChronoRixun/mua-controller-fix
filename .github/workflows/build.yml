@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # to publish releases from tags
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: build/bin/Release/fix_test.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "dev-$($env:GITHUB_SHA.Substring(0, 7))" }
+          $name = "mua-controller-fix-$version"
+          New-Item -ItemType Directory "dist/$name" -Force | Out-Null
+          Copy-Item build/bin/Release/dinput8.dll, LICENSE, packaging/INSTALL.txt "dist/$name/"
+          Compress-Archive -Path "dist/$name/*" -DestinationPath "dist/$name.zip"
+          "PACKAGE=dist/$name.zip" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mua-controller-fix
+          path: ${{ env.PACKAGE }}
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = "packaging/release-notes/$($env:GITHUB_REF_NAME).md"
+          if (Test-Path $notes) {
+            gh release create $env:GITHUB_REF_NAME $env:PACKAGE --title "MUA Controller Fix $($env:GITHUB_REF_NAME)" --notes-file $notes
+          } else {
+            gh release create $env:GITHUB_REF_NAME $env:PACKAGE --title "MUA Controller Fix $($env:GITHUB_REF_NAME)" --generate-notes
+          }
