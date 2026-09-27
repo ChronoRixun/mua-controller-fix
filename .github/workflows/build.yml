@@ -35,6 +35,14 @@ jobs:
           Compress-Archive -Path "dist/$name/*" -DestinationPath "dist/$name.zip"
           "PACKAGE=dist/$name.zip" >> $env:GITHUB_ENV
 
+          # Loose DLL plus a patch manifest ([name, size, SHA-1, destination]) for launchers such as
+          # Ultimate Legends, which fetch releases/latest/download/ultimate-legends.json.
+          Copy-Item build/bin/Release/dinput8.dll dist/dinput8.dll
+          $dll = Get-Item dist/dinput8.dll
+          $sha1 = (Get-FileHash dist/dinput8.dll -Algorithm SHA1).Hash.ToUpperInvariant()
+          ConvertTo-Json -Compress -Depth 3 -InputObject @(, @('dinput8.dll', $dll.Length, $sha1, 'game')) | Set-Content -NoNewline dist/ultimate-legends.json
+          Get-Content dist/ultimate-legends.json
+
       - uses: actions/upload-artifact@v7
         with:
           name: mua-controller-fix
@@ -47,8 +55,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $notes = "packaging/release-notes/$($env:GITHUB_REF_NAME).md"
+          $assets = @($env:PACKAGE, 'dist/dinput8.dll', 'dist/ultimate-legends.json')
           if (Test-Path $notes) {
-            gh release create $env:GITHUB_REF_NAME $env:PACKAGE --title "MUA Controller Fix $($env:GITHUB_REF_NAME)" --notes-file $notes
+            gh release create $env:GITHUB_REF_NAME @assets --title "MUA Controller Fix $($env:GITHUB_REF_NAME)" --notes-file $notes
           } else {
-            gh release create $env:GITHUB_REF_NAME $env:PACKAGE --title "MUA Controller Fix $($env:GITHUB_REF_NAME)" --generate-notes
+            gh release create $env:GITHUB_REF_NAME @assets --title "MUA Controller Fix $($env:GITHUB_REF_NAME)" --generate-notes
           }
