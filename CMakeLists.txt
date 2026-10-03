@@ -21,6 +21,8 @@ add_library(controller_fix SHARED
 	src/gamepad_fix.cpp
 	src/xinput_pad.cpp
 	src/log.cpp
+	src/iat_hook.cpp
+	src/steam_presence.cpp
 	src/dinput8.def
 	src/version.rc)
 target_link_libraries(controller_fix PRIVATE dxguid)
