@@ -22,14 +22,17 @@ namespace loose_first
 		using namespace std::string_view_literals;
 
 		// The 2016 ports keep their files in encrypted .bin archives, a layer of their own under the engine's
-		// file system: when the engine's native device opens a file, it first asks a lookup function whether
-		// one of the archives has it (archive by the path's first folder, entry by name). Only if not does it
-		// call CreateFileA on the loose path - the call the mod loader redirects. That lookup has one caller;
-		// redirecting the call makes it report "not in the archives" for every file a mod has.
+		// file system: when the engine opens a file natively, it first asks a lookup function whether one of
+		// the archives has it (archive by the path's first folder, entry by name). Only if not does it open
+		// the loose path - through the exe's imports, which the mod loader redirects. In both games that
+		// lookup has one caller; redirecting the call makes it report "not in the archives" for every file a
+		// mod has. Its arguments: rcx = the path, rdx = the archive found, r8 = its entry.
 		//
-		// MUA2 (Alliance.exe): the native open 0x140274070 calls the lookup 0x140273570 at 0x1402740fd with
-		// rcx = the path, rdx = the archive found, r8 = its entry; on a miss it calls CreateFileA through the
-		// exe's import at 0x140274188. Addresses are the retail exe's at its preferred base; RVAs below.
+		// MUA1 (Marvel.exe): igStandardFile's open 0x1400a21c0 calls the lookup 0x1400a1700 at 0x1400a23d5;
+		// on a miss it calls fopen (MSVCR110) on the same path at 0x1400a2402.
+		// MUA2 (Alliance.exe): the native device's open 0x140274070 calls the lookup 0x140273570 at
+		// 0x1402740fd; on a miss it calls CreateFileA at 0x140274188.
+		// Addresses are the retail exes' at their preferred base; RVAs below.
 		struct code_check
 		{
 			std::uint32_t rva;
@@ -42,6 +45,13 @@ namespace loose_first
 			std::uint32_t call; // the `call lookup` to redirect
 			std::uint32_t lookup;
 		};
+
+		constexpr code_check mua1_checks[] = {
+			{0x0a23cd, "\xC7\x44\x24\x24\xFF\xFF\xFF\xFF\xE8\x26\xF3\xFF\xFF\x84\xC0\x74\x1E"sv}, // mov [rsp+24],-1; call lookup; test al,al; je miss
+			{0x0a1700, "\x41\x56\x41\x57\x48\x81\xEC\x68\x02\x00\x00"sv},                         // the lookup's prologue
+			{0x0a23fc, "\x49\x8B\xD6\x48\x8B\xCD\xFF\x15\xA0\xF1\x6C\x00"sv},                     // miss: fopen(path, mode)
+		};
+		constexpr game_code mua1{mua1_checks, 0x0a23d5, 0x0a1700};
 
 		constexpr code_check mua2_checks[] = {
 			{0x2740f2, "\xC7\x84\x24\x80\x00\x00\x00\xFF\xFF\xFF\xFF\xE8\x6E\xF4\xFF\xFF\x84\xC0\x74\x5D"sv}, // mov [rsp+80],-1; call lookup; test al,al; je miss
@@ -191,11 +201,12 @@ namespace loose_first
 		wchar_t exe[MAX_PATH]{};
 		const std::wstring_view path(exe, GetModuleFileNameW(nullptr, exe, MAX_PATH));
 		const auto slash = path.find_last_of(L"\\/");
-		if (discord_rules::game_from_exe(path.substr(slash == std::wstring_view::npos ? 0 : slash + 1)) != discord_rules::game::mua2)
+		const auto game = discord_rules::game_from_exe(path.substr(slash == std::wstring_view::npos ? 0 : slash + 1));
+		if (!game)
 		{
 			return;
 		}
-		code = &mua2;
+		code = *game == discord_rules::game::mua1 ? &mua1 : &mua2;
 
 		const HMODULE module = GetModuleHandleW(nullptr);
 		image = reinterpret_cast<std::byte*>(module);

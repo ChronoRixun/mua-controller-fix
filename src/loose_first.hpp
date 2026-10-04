@@ -3,7 +3,7 @@
 // Makes the game read a mod's copy of a file it keeps in its .bin archives (models, textures, data):
 // the 2016 ports look a file up in their archives before they ever ask Windows for it, so the mod loader
 // (mod_loader.hpp) would never see the request. For a file a mod has, the archive lookup reports "not
-// here" and the game opens the loose path, which the mod loader redirects to the mod. Done for MUA2.
+// here" and the game opens the loose path, which the mod loader redirects to the mod.
 //
 // Nothing is changed until every byte of the game's code it relies on matches the retail build. On the
 // Steam release that code is still encrypted (SteamStub) while the DLL loads, so the check is repeated
