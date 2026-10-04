@@ -363,7 +363,7 @@ namespace mod_loader
 		}
 	}
 
-	void install(const std::initializer_list<const char*> modules, const bool trace_files)
+	bool install(const std::initializer_list<const char*> modules, const bool trace_files)
 	{
 		tracing = trace_files;
 
@@ -379,7 +379,7 @@ namespace mod_loader
 		build_index();
 		if (files.empty() && !tracing)
 		{
-			return; // nothing to load: leave file access alone
+			return false; // nothing to load: leave file access alone
 		}
 
 		for (const char* name : modules)
@@ -390,5 +390,25 @@ namespace mod_loader
 			}
 		}
 		logger::write("mods: %zu file(s) from mods%s", files.size(), tracing ? " (tracing file access)" : "");
+		return true;
+	}
+
+	bool provides(const char* path)
+	{
+		if (files.empty() || !path || !*path)
+		{
+			return false;
+		}
+		auto relative = lower(widen(path));
+		std::replace(relative.begin(), relative.end(), L'/', L'\\');
+		if (relative.compare(0, game_dir.size(), game_dir) == 0)
+		{
+			relative.erase(0, game_dir.size());
+		}
+		while (relative.compare(0, 2, L".\\") == 0)
+		{
+			relative.erase(0, 2);
+		}
+		return files.contains(relative);
 	}
 }
