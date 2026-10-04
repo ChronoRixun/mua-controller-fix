@@ -2,12 +2,15 @@
 // the fix exactly the way it does for the game. Checks the forwarding exports and - with
 // an Xbox-compatible pad connected - that the pad is presented as a wired Xbox 360
 // controller through both the Unicode and ANSI interfaces (the games use ANSI). Also checks the
-// Discord presence's rules (discord_rules.hpp) without Discord or the game.
+// Discord presence's rules (discord_rules.hpp) without Discord or the game, and the mod loader:
+// the load order (mod_order.hpp) and, in a copy of this program set up like a game folder with
+// mods, which files its reads get.
 //
 //   fix_test.exe          run the checks
 //   fix_test.exe --live   also show live pad input, as the games see it, for 20 seconds
 
 #include "../src/discord_rules.hpp"
+#include "../src/mod_order.hpp"
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <Windows.h>
@@ -46,6 +49,13 @@ namespace
 	{
 		std::ifstream in(path, std::ios::binary);
 		return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+	}
+
+	void write_file(const std::filesystem::path& path, const std::string& text)
+	{
+		std::error_code ignored;
+		std::filesystem::create_directories(path.parent_path(), ignored);
+		std::ofstream(path, std::ios::binary) << text;
 	}
 
 	int connected_xinput_pads()
@@ -153,14 +163,151 @@ namespace
 		huge[6] = 0x10; // a length of 1 MiB
 		CHECK(!in.take(huge) && in.problem() != nullptr);
 	}
+
+	// mods\load-order.txt, as the mod loader reads it (mod_order.hpp): a mod it switches off, or a
+	// leftover .staging folder, doesn't load; a folder it doesn't list loads after the listed ones.
+	void check_mod_order()
+	{
+		namespace fs = std::filesystem;
+		std::printf("mods: the load order (mod_order.hpp)\n");
+		const auto root = fs::temp_directory_path() / ("fix_test-mods-" + std::to_string(GetCurrentProcessId()));
+		std::error_code ignored;
+		fs::remove_all(root, ignored);
+		CHECK(mod_order::load_order(root).empty() && mod_order::enabled_mods(root).empty()); // no mods folder at all
+		write_file(root / L"A/data/a.engb", "x");
+		write_file(root / L".staging-00000001/data/b.engb", "x"); // a launcher import cut short
+		write_file(root / L"B/data/c.engb", "x");
+		fs::create_directories(root / L"C", ignored);
+		write_file(root / L"load-order.txt", "\xEF\xBB\xBF# the launcher's list\r\n-A\r\n+C\r\n\r\nnot an entry\r\n");
+		const auto order = mod_order::load_order(root);
+		CHECK(order.size() == 3 && order[0].name == L"A" && !order[0].enabled && order[1].name == L"C" && order[1].enabled && order[2].name == L"B" && order[2].enabled);
+		const auto mods = mod_order::enabled_mods(root);
+		CHECK(mods.size() == 2 && mods[0].first == L"C" && mods[1].first == L"B" && mods[1].second == root / L"B");
+		write_file(root / L"load-order.txt", "+b\n-c\n+Gone\n"); // names in any case; a listed folder that isn't there
+		const auto listed = mod_order::enabled_mods(root);
+		CHECK(listed.size() == 2 && listed[0].first == L"b" && listed[1].first == L"A"); // A unlisted now: after b
+		fs::create_directories(root / L"Café", ignored);
+		write_file(root / L"load-order.txt", "-Caf\xC3\xA9\n"); // UTF-8
+		const auto named = mod_order::load_order(root);
+		CHECK(named.size() == 4 && named[0].name == L"Café" && !named[0].enabled);
+		fs::remove_all(root, ignored);
+	}
+
+	// What a read of `path` through Windows gets: the file's first bytes, or "(none)" when it can't be opened.
+	std::string read_through(const HANDLE file)
+	{
+		if (file == INVALID_HANDLE_VALUE)
+		{
+			return "(none)";
+		}
+		char buffer[64]{};
+		DWORD read = 0;
+		ReadFile(file, buffer, sizeof(buffer), &read, nullptr);
+		CloseHandle(file);
+		return {buffer, read};
+	}
+
+	std::string read_a(const char* path)
+	{
+		return read_through(CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr));
+	}
+
+	std::string read_w(const std::filesystem::path& path)
+	{
+		return read_through(CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr));
+	}
+
+	// fix_test --mods-child: runs in the folder check_mod_loader sets up. The fix hooked this program's file
+	// access as it hooks a game's: the program imports the same Windows functions and asks with the same
+	// kinds of paths (relative to the game folder, '/' or '\', any case).
+	int mods_child()
+	{
+		const auto game = module_path(nullptr).parent_path();
+		CHECK(read_a("data/probe.engb") == "high");                // the later mod in load-order.txt wins
+		CHECK(read_w(game / L"data" / L"probe.engb") == "high");   // full path, wide
+		CHECK(read_a("DATA\\Only_Low.engb") == "low");             // a file only the earlier mod has, in another case
+		CHECK(read_a("data/off.engb") == "(none)");                // its mod is switched off
+		CHECK(read_a("data/staged.engb") == "(none)");             // .staging folders never load
+		CHECK(read_a("readme.txt") == "(none)");                   // a mod's own readme isn't a game file
+		CHECK(GetFileAttributesW((game / L"probe.txt").c_str()) != INVALID_FILE_ATTRIBUTES); // only a mod has it
+		WIN32_FILE_ATTRIBUTE_DATA attributes{};
+		CHECK(GetFileAttributesExA("probe.txt", GetFileExInfoStandard, &attributes) && attributes.nFileSizeLow == 4);
+		WIN32_FIND_DATAW found{};
+		const HANDLE search = FindFirstFileW((game / L"probe.txt").c_str(), &found);
+		CHECK(search != INVALID_HANDLE_VALUE && std::wstring(found.cFileName) == L"probe.txt");
+		if (search != INVALID_HANDLE_VALUE)
+		{
+			FindClose(search);
+		}
+
+		// A write goes to the game folder (check_mod_loader looks); reads still get the mod's copy.
+		const HANDLE file = CreateFileW((game / L"probe.txt").c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
+		DWORD written = 0;
+		CHECK(file != INVALID_HANDLE_VALUE && WriteFile(file, "game", 4, &written, nullptr) && written == 4);
+		CloseHandle(file);
+		CHECK(read_a("probe.txt") == "high");
+		return failures;
+	}
+
+	// The mod loader in a process of its own: a copy of this program and the DLL in a folder laid out like a
+	// game's, with mods. The copy runs mods_child() and reports its failures through its exit code.
+	void check_mod_loader(const std::filesystem::path& dir)
+	{
+		namespace fs = std::filesystem;
+		std::printf("mods: the loader, in a copy of this program set up like a game folder\n");
+		const auto game = fs::temp_directory_path() / ("fix_test-game-" + std::to_string(GetCurrentProcessId()));
+		std::error_code ignored;
+		fs::remove_all(game, ignored);
+		fs::create_directories(game, ignored);
+		CHECK(fs::copy_file(dir / L"fix_test.exe", game / L"fix_test.exe", ignored) && fs::copy_file(dir / L"dinput8.dll", game / L"dinput8.dll", ignored));
+		write_file(game / L"mods/Low/data/probe.engb", "low");
+		write_file(game / L"mods/Low/data/only_low.engb", "low");
+		write_file(game / L"mods/High/data/probe.engb", "high");
+		write_file(game / L"mods/High/probe.txt", "high");
+		write_file(game / L"mods/High/readme.txt", "about the mod");
+		write_file(game / L"mods/Off/data/off.engb", "off");
+		write_file(game / L"mods/.staging-00000001/data/staged.engb", "staged");
+		write_file(game / L"mods/load-order.txt", "+Low\n-Off\n+High\n");
+
+		std::fflush(stdout);
+		STARTUPINFOW startup{sizeof(startup)};
+		startup.dwFlags = STARTF_USESTDHANDLES;
+		startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+		startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+		startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+		PROCESS_INFORMATION process{};
+		auto command = L"\"" + (game / L"fix_test.exe").wstring() + L"\" --mods-child";
+		DWORD code = 1;
+		if (CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, 0, nullptr, game.c_str(), &startup, &process))
+		{
+			WaitForSingleObject(process.hProcess, 30000);
+			GetExitCodeProcess(process.hProcess, &code);
+			CloseHandle(process.hThread);
+			CloseHandle(process.hProcess);
+		}
+		CHECK(code == 0); // the copy's checks, above
+		CHECK(read_file(game / L"probe.txt") == "game" && read_file(game / L"mods/High/probe.txt") == "high");
+		const auto log = read_file(game / L"mua-controller-fix.log");
+		CHECK(log.find("mods: Low - 2 file(s)") != std::string::npos && log.find("mods: High - 2 file(s)") != std::string::npos);
+		CHECK(log.find("mods: Off") == std::string::npos && log.find("staging") == std::string::npos);
+		CHECK(log.find("mods: 3 file(s) from mods") != std::string::npos && log.find("mods: CreateFileA data/probe.engb -> ") != std::string::npos);
+		fs::remove_all(game, ignored);
+	}
 }
 
 int main(int argc, char** argv)
 {
+	if (argc > 1 && std::strcmp(argv[1], "--mods-child") == 0)
+	{
+		return mods_child();
+	}
+
 	const bool live = argc > 1 && std::strcmp(argv[1], "--live") == 0;
 	const auto dir = module_path(nullptr).parent_path();
 
 	check_discord_rules();
+	check_mod_order();
+	check_mod_loader(dir);
 
 	std::printf("the fix is the dinput8.dll this program loaded\n");
 	const auto fix = GetModuleHandleW(L"dinput8.dll");
