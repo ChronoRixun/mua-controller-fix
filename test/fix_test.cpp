@@ -134,6 +134,9 @@ namespace
 		CHECK(parse_switch(std::nullopt, true) && !parse_switch("0  ; off", true) && parse_switch("Yes", false) && parse_switch("maybe", true));
 		CHECK(valid_client_id("1556189142092746874") && !valid_client_id("12345") && !valid_client_id("15561891420927468x4"));
 		CHECK(valid_asset("logo") && !valid_asset("my logo") && !valid_asset(""));
+		CHECK(choose_large_image(std::nullopt).key == "logo" && choose_large_image("  ; later").key == "logo");
+		CHECK(choose_large_image("None").key.empty() && choose_large_image("art2").key == "art2");
+		CHECK(choose_large_image("my logo").key == "logo" && choose_large_image("my logo").refused);
 
 		const auto json = set_activity_json(42, {"Latveria: Urban Warfare", "Playing as \"Wolverine\""}, {1700000000, "", "Marvel: Ultimate Alliance 2"}, 7);
 		CHECK(json == R"({"cmd":"SET_ACTIVITY","args":{"pid":42,"activity":{"details":"Latveria: Urban Warfare","state":"Playing as \"Wolverine\"","timestamps":{"start":1700000000}}},"nonce":"7"})");

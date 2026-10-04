@@ -270,17 +270,11 @@ namespace discord_presence
 				logger::write("discord: [Discord] ClientId=%.*s isn't an application id (15 to 20 digits) - ignored", static_cast<int>(id.size()), id.data());
 			}
 		}
-		if (const auto image = ini_text(L"Discord", L"LargeImage"))
+		const auto image = choose_large_image(view(ini_text(L"Discord", L"LargeImage")));
+		presence_extras.large_image = image.key;
+		if (image.refused)
 		{
-			const auto key = value_text(*image);
-			if (valid_asset(key))
-			{
-				presence_extras.large_image = std::string(key);
-			}
-			else if (!key.empty())
-			{
-				logger::write("discord: [Discord] LargeImage isn't an asset key (no spaces or quotes, at most 256 characters) - ignored");
-			}
+			logger::write("discord: [Discord] LargeImage isn't an asset key (no spaces or quotes, at most 256 characters) - ignored");
 		}
 		show.zone = parse_switch(view(ini_text(L"Discord", L"ShowZone")), true);
 		show.hero = parse_switch(view(ini_text(L"Discord", L"ShowHero")), true);

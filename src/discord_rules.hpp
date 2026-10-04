@@ -115,13 +115,31 @@ namespace discord_rules
 		return id.size() >= 15 && id.size() <= 20 && std::all_of(id.begin(), id.end(), [](const char c) { return c >= '0' && c <= '9'; });
 	}
 
-	// [Discord] LargeImage: an art asset's key in the Discord application (or an image URL), printable
-	// ASCII without spaces or quotes, at most 256 characters. The applications have no art yet, so
-	// there's no picture unless the key names one.
+	// An art asset's key in the Discord application (or an image URL): printable ASCII without spaces or
+	// quotes, at most 256 characters.
 	inline bool valid_asset(const std::string_view key)
 	{
 		return !key.empty() && key.size() <= 256 &&
 		       std::all_of(key.begin(), key.end(), [](const char c) { return c > ' ' && c < 0x7f && c != '"' && c != '\\'; });
+	}
+
+	// Both applications' picture (docs/discord-art), shown large in the activity.
+	inline constexpr std::string_view large_image_key = "logo";
+
+	struct image_choice
+	{
+		std::string key;      // "": no picture
+		bool refused = false; // the value isn't an asset key: the logo stays, and the log says so
+	};
+
+	// [Discord] LargeImage: not set, the application's logo; none, no picture; else that asset.
+	inline image_choice choose_large_image(const std::optional<std::string_view> value)
+	{
+		const auto text = value ? value_text(*value) : std::string_view();
+		if (text.empty()) return {std::string(large_image_key)};
+		if (lowercase(text) == "none") return {""};
+		if (valid_asset(text)) return {std::string(text)};
+		return {std::string(large_image_key), true};
 	}
 
 	// ---- Text -------------------------------------------------------------------------------------
@@ -600,7 +618,7 @@ namespace discord_rules
 	struct extras
 	{
 		std::int64_t start = 0;  // the elapsed timer's start, Unix seconds; 0: none
-		std::string large_image; // [Discord] LargeImage; "": no picture
+		std::string large_image; // choose_large_image; "": no picture
 		std::string large_text;  // its tooltip: the game's title
 	};
 
