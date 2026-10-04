@@ -18,6 +18,15 @@ DISCORD
     Enabled=0
   More settings and what's shared: see the README on GitHub.
 
+MODS
+  Put each mod in its own folder under a "mods" folder next to the game's .exe, laid out like
+  the game folder (mods\My Mod\data\...). The game's own files are never changed. Which mods
+  load, and which wins when two have the same file: mods\load-order.txt (+Name on, -Name off,
+  later lines win). A mod's file replaces the game's file with the same path, including the
+  ones inside the game's .bin archives (actors.bin's 0301.igb is mods\My Mod\actors\0301.igb):
+  costumes, models, textures, data, menus, movies and sounds. Restart the game after adding
+  or changing a mod. Details: see the README on GitHub.
+
 TROUBLESHOOTING
   The fix writes mua-controller-fix.log next to itself each time the game starts.
   If something is wrong, open an issue on GitHub and attach that file.
