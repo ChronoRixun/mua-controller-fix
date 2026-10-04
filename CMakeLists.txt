@@ -23,6 +23,8 @@ add_library(controller_fix SHARED
 	src/log.cpp
 	src/iat_hook.cpp
 	src/steam_presence.cpp
+	src/discord_presence.cpp
+	src/discord_ipc.cpp
 	src/dinput8.def
 	src/version.rc)
 target_link_libraries(controller_fix PRIVATE dxguid)

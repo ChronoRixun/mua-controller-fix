@@ -1,5 +1,7 @@
 #include "steam_presence.hpp"
 
+#include "discord_presence.hpp"
+#include "discord_rules.hpp"
 #include "iat_hook.hpp"
 #include "log.hpp"
 
@@ -7,7 +9,6 @@
 
 #include <cstddef>
 #include <cstring>
-#include <map>
 #include <mutex>
 #include <string>
 
@@ -34,7 +35,10 @@ namespace steam_presence
 		clear_presence_fn real_clear_presence = nullptr;
 
 		std::mutex mutex;
-		std::map<std::string, std::string> published; // what the game last set, by key
+		discord_rules::first_of_burst bursts; // player 1's status line is the first of each burst (discord_rules.hpp)
+		std::string player_status;            // as the game last set it
+		unsigned status_changes = 0;
+		constexpr unsigned changes_to_log = 100;
 
 		// Points `slot` of `object`'s vtable at `replacement` and stores the previous entry in `real`.
 		// The vtable belongs to the Steam client (the emulator, or Steam itself), not the game.
@@ -83,32 +87,52 @@ namespace steam_presence
 
 		bool hook_set_presence(void* self, const char* key, const char* value)
 		{
-			const std::string k = key ? key : "";
-			const std::string v = value ? value : "";
-			bool changed = false;
+			if (key && std::strcmp(key, "status") == 0)
 			{
-				std::lock_guard lock(mutex);
-				auto [entry, added] = published.try_emplace(k, v);
-				changed = added || entry->second != v;
-				entry->second = v;
+				const std::string line = value ? value : "";
+				bool changed = false;
+				unsigned change = 0;
+				{
+					std::lock_guard lock(mutex);
+					if (bursts.take(GetTickCount64()) && line != player_status)
+					{
+						player_status = line;
+						changed = true;
+						change = status_changes++;
+					}
+				}
+				if (changed)
+				{
+					discord_presence::set_status(line);
+					if (change < changes_to_log)
+					{
+						logger::write("steam: status \"%s\"", printable(value).c_str());
+					}
+					else if (change == changes_to_log)
+					{
+						logger::write("steam: (further status changes aren't logged)");
+					}
+				}
 			}
-			if (changed)
+			else
 			{
-				logger::write("steam: SetRichPresence(\"%s\", \"%s\")", printable(key).c_str(), printable(value).c_str());
+				// Shown nowhere ("connect" names the online lobby): only that the game sets it is logged.
+				logger::write_once(std::string("key ") + printable(key), "steam: the game sets \"%s\" (not shown on Discord)", printable(key).c_str());
 			}
 			return real_set_presence(self, key, value);
 		}
 
 		void hook_clear_presence(void* self)
 		{
-			bool had_any = false;
+			bool had_status = false;
 			{
 				std::lock_guard lock(mutex);
-				had_any = !published.empty();
-				published.clear();
+				had_status = !player_status.empty();
+				player_status.clear();
 			}
-			if (had_any)
+			if (had_status)
 			{
+				discord_presence::set_status("");
 				logger::write("steam: ClearRichPresence()");
 			}
 			real_clear_presence(self);
