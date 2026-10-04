@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(mua_controller_fix VERSION 1.0.0 LANGUAGES CXX RC)
+project(mua_controller_fix VERSION 1.1.0 LANGUAGES CXX RC)
 
 if(NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
 	message(FATAL_ERROR "Build with MSVC for x64 - the 2016 Marvel: Ultimate Alliance ports are 64-bit.")

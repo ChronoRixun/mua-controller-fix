@@ -47,7 +47,7 @@ extern "C"
 {
 	const char* MuaControllerFix_Version()
 	{
-		return "MUA Controller Fix 1.0.0";
+		return "MUA Controller Fix 1.1.0";
 	}
 
 	HRESULT WINAPI proxy_DirectInput8Create(HINSTANCE instance, DWORD version, REFIID riid, LPVOID* out, LPUNKNOWN outer)

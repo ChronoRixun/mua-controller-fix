@@ -11,6 +11,13 @@ INSTALL
 UNINSTALL
   Delete dinput8.dll from the game folder.
 
+DISCORD
+  With the Discord app running, your Discord profile shows what you're playing (the area
+  and your hero). To switch it off, create mua-controller-fix.ini next to dinput8.dll with:
+    [Discord]
+    Enabled=0
+  More settings and what's shared: see the README on GitHub.
+
 TROUBLESHOOTING
   The fix writes mua-controller-fix.log next to itself each time the game starts.
   If something is wrong, open an issue on GitHub and attach that file.

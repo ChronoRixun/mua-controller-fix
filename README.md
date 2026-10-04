@@ -25,6 +25,8 @@ Playing **Marvel: Ultimate Alliance** or **Marvel: Ultimate Alliance 2** on PC w
 | On-screen button icons | don't match your pad | match your pad |
 | Setup               | remapping tools or community Steam Input configs | copy one file |
 
+It also shows what you're playing on **Discord**: the area and your hero, taken from the game itself ([details](#-discord)).
+
 ## ⚡ Install
 
 1. **[Download the latest release](https://github.com/ChronoRixun/mua-controller-fix/releases/latest)** and unzip it.
@@ -87,7 +89,36 @@ flowchart LR
     fix -. "everything else, unchanged" .-> di["Windows DirectInput"]
 ```
 
-It doesn't touch Steam, your saves, online play or any game files, and it doesn't need an installer. Remove the DLL and the game is exactly as it was.
+It doesn't change your saves, online play or any game files, and it doesn't need an installer. Remove the DLL and the game is exactly as it was.
+
+## 💬 Discord
+
+On by default. With the Discord app running on the same PC, your Discord profile shows what you're doing in the game while it runs, with the game's picture and the time played:
+
+| In the game | Discord shows |
+| ----------- | ------------- |
+| Starting up | the game's name and the time |
+| Main menu | **In the Main Menu** |
+| A mission or a hub | **Latveria: Urban Warfare**<br>Playing as Wolverine |
+
+**Where the text comes from:** both games already write a status line for Steam's friends list ("Playing *area* As *hero*"). The fix reads that line as the game hands it to Steam, passes the call on unchanged, and shows the same text on Discord. A few of MUA1's short names are spelled out (*Stark* → *Stark Tower*, *Moonknight* → *Moon Knight*). In co-op it shows player 1's hero. (The games write the line once for each of the four player slots, so on Steam an empty slot's "Watching someone else play." always wins. Discord gets player 1's.)
+
+An update goes out at most every 5 seconds (Discord allows about five in 20 seconds), and quitting the game clears it. Discord not running? The fix looks for it every 20 seconds, quietly, and connects once it starts.
+
+**What's shared:** only that text (the area and player 1's hero) and the time since the game started. No player names, no PC, network or account details, and nothing about online lobbies. It goes to the Discord app on your own PC through its local pipe, and Discord shows it to whoever Discord shows your activity to (*User Settings → Activity Privacy* decides who).
+
+**Settings** go in `mua-controller-fix.ini`, next to `dinput8.dll` (create it). Every key is optional:
+
+```ini
+[Discord]
+Enabled=1      ; 0: no Discord presence at all
+ShowZone=1     ; 0: hide the area
+ShowHero=1     ; 0: hide the hero
+LargeImage=    ; none: no picture (empty: the game's I / II)
+ClientId=      ; another Discord application's id, for testing
+```
+
+The pictures are the project's own art ([docs/discord-art](docs/discord-art)): no game or publisher artwork.
 
 ## 🧰 Troubleshooting
 
@@ -95,6 +126,7 @@ It doesn't touch Steam, your saves, online play or any game files, and it doesn'
 - **Every launch writes `mua-controller-fix.log`** next to the DLL. It lists the controllers the game saw and what the fix did. Attach it to any bug report.
 - **Already using another mod called `dinput8.dll`** (e.g. an ASI loader)? Only one file can have that name, so the two will conflict. Open an issue and we'll look at a compatible option.
 - **Using Steam Input for the game** and buttons are still off? Try turning Steam Input off for the game (**Properties → Controller**), so the game sees your pad directly.
+- **Nothing on Discord?** The Discord desktop app has to be running on the same PC, with **User Settings → Activity Privacy → Share your detected activities with others** switched on. The log's `discord:` lines say whether the fix connected (`discord: connected as Marvel: Ultimate Alliance 2`) and what it sent (`discord: presence -> …`).
 
 ## 🏗️ Building from source
 
@@ -106,10 +138,10 @@ cmake --build build --config Release
 build\bin\Release\fix_test.exe          # add --live to watch your pad as the game sees it
 ```
 
-The output is `build\bin\Release\dinput8.dll`. `fix_test.exe` loads it exactly the way the game does and checks the forwarding and, with a controller connected, the presented identity and input layout through both DirectInput interfaces. Release builds are produced by [GitHub Actions](.github/workflows/build.yml) from tagged source.
+The output is `build\bin\Release\dinput8.dll`. `fix_test.exe` loads it exactly the way the game does and checks the forwarding and, with a controller connected, the presented identity and input layout through both DirectInput interfaces. It also checks the Discord presence's rules (how status lines are worded, what's sent to Discord). Release builds are produced by [GitHub Actions](.github/workflows/build.yml) from tagged source.
 
 ## 📜 License & disclaimer
 
 [MIT](LICENSE). Use it, share it, build on it.
 
-This is an unofficial fan fix. It is not affiliated with or endorsed by Activision, Marvel, Disney or Microsoft. It contains no game files or game code; you need your own copy of the game.
+This is an unofficial fan fix. It is not affiliated with or endorsed by Activision, Marvel, Disney, Microsoft or Discord. It contains no game files or game code; you need your own copy of the game.
