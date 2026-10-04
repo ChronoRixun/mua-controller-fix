@@ -23,6 +23,7 @@ add_library(controller_fix SHARED
 	src/log.cpp
 	src/iat_hook.cpp
 	src/steam_presence.cpp
+	src/steam_online.cpp
 	src/discord_presence.cpp
 	src/discord_ipc.cpp
 	src/dinput8.def

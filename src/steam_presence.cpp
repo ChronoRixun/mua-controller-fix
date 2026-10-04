@@ -4,6 +4,7 @@
 #include "discord_rules.hpp"
 #include "iat_hook.hpp"
 #include "log.hpp"
+#include "steam_online.hpp"
 
 #include <Windows.h>
 
@@ -165,10 +166,13 @@ namespace steam_presence
 		{
 			void* result = real_create_interface(version);
 			logger::write_once(std::string("interface ") + printable(version), "steam: SteamInternal_CreateInterface(\"%s\") -> %p", printable(version).c_str(), result);
-			if (result && version && std::strcmp(version, client_version) == 0 &&
-			    !patch_slot(result, client_get_friends_slot, reinterpret_cast<void*>(&hook_get_friends), real_get_friends))
+			if (result && version && std::strcmp(version, client_version) == 0)
 			{
-				logger::write("steam: ERROR: could not hook %s (error %lu)", client_version, GetLastError());
+				if (!patch_slot(result, client_get_friends_slot, reinterpret_cast<void*>(&hook_get_friends), real_get_friends))
+				{
+					logger::write("steam: ERROR: could not hook %s (error %lu)", client_version, GetLastError());
+				}
+				steam_online::watch_client(result); // lobbies, the game server, P2P sessions
 			}
 			return result;
 		}

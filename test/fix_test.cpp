@@ -8,6 +8,7 @@
 //   fix_test.exe --live   also show live pad input, as the games see it, for 20 seconds
 
 #include "../src/discord_rules.hpp"
+#include "../src/online_rules.hpp"
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <Windows.h>
@@ -153,6 +154,27 @@ namespace
 		huge[6] = 0x10; // a length of 1 MiB
 		CHECK(!in.take(huge) && in.problem() != nullptr);
 	}
+
+	// What online play changes, and only under an app ID the game shares with others.
+	void check_online_rules()
+	{
+		using namespace online_rules;
+		std::printf("online rules\n");
+
+		CHECK(game_id::steam_app_id(game::mua1) == 433300 && game_id::steam_app_id(game::mua2) == 433320);
+		CHECK(!shared_app(game::mua2, 433320) && !shared_app(game::mua1, 433300) && !shared_app(game::mua2, 0)); // its own, or unknown: nothing changes
+		CHECK(shared_app(game::mua2, 480) && shared_app(game::mua1, 480) && shared_app(game::mua1, 433320));
+		CHECK(tag_key == "mua_fix_game" && tag_value(game::mua1) == "mua1" && tag_value(game::mua2) == "mua2");
+		CHECK(lobby_type_name(2) == "public" && lobby_type_name(1) == "friends only" && comparison_name(0) == "=");
+
+		const std::uint8_t direct[4] = {1, 0, 0, 0};
+		const std::uint8_t relayed[4] = {1, 0, 0, 1};
+		const std::uint8_t connecting[4] = {0, 1, 0, 0};
+		const std::uint8_t timed_out[4] = {0, 0, 4, 0};
+		CHECK(describe(p2p_state_from(direct)) == "connected directly" && describe(p2p_state_from(relayed)) == "connected through Steam's relay");
+		CHECK(describe(p2p_state_from(connecting)) == "connecting" && describe(p2p_state_from(timed_out)) == "failed (timed out)");
+		CHECK(p2p_state_from(direct) != p2p_state_from(relayed));
+	}
 }
 
 int main(int argc, char** argv)
@@ -161,6 +183,7 @@ int main(int argc, char** argv)
 	const auto dir = module_path(nullptr).parent_path();
 
 	check_discord_rules();
+	check_online_rules();
 
 	std::printf("the fix is the dinput8.dll this program loaded\n");
 	const auto fix = GetModuleHandleW(L"dinput8.dll");

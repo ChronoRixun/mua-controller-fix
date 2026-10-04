@@ -21,6 +21,8 @@
 // activity when its pipe closes, and allows about five updates in 20 seconds. Whatever is on the
 // other end of the pipe is held to what Discord sends: frames of at most 64 KiB, a few at a time.
 
+#include "game_id.hpp"
+
 #include <Windows.h>
 
 #include <algorithm>
@@ -35,28 +37,12 @@ namespace discord_rules
 {
 	// ---- Which game -------------------------------------------------------------------------------
 
-	enum class game
-	{
-		mua1, // Marvel.exe
-		mua2, // Alliance.exe
-	};
+	using game_id::game;
+	using game_id::game_from_exe;
 
 	// The two Discord applications (public ids), named after the games.
 	inline constexpr std::string_view mua1_client_id = "1556188950123511889";
 	inline constexpr std::string_view mua2_client_id = "1556189142092746874";
-
-	// The game from its executable's file name, in any case; nullopt for anything else (the test).
-	inline std::optional<game> game_from_exe(const std::wstring_view file_name)
-	{
-		const auto is = [&](const std::wstring_view name)
-		{
-			return file_name.size() == name.size() && std::equal(file_name.begin(), file_name.end(), name.begin(), [](const wchar_t a, const wchar_t b)
-			                                                     { return (a >= L'A' && a <= L'Z' ? a - L'A' + L'a' : a) == b; });
-		};
-		if (is(L"marvel.exe")) return game::mua1;
-		if (is(L"alliance.exe")) return game::mua2;
-		return std::nullopt;
-	}
 
 	inline std::string_view client_id_for(const game which)
 	{
