@@ -11,6 +11,7 @@
 
 namespace loose_first
 {
-	// Call after mod_loader::install has hooked the game, and only when it did.
-	void install();
+	// Call after mod_loader::install has hooked the game, and only when it did. With `trace`, logs
+	// every archive lookup ("files: from the archives: actors/1501.igz") - the names a mod uses.
+	void install(bool trace);
 }

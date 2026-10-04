@@ -82,13 +82,20 @@ namespace loose_first
 		using lookup_t = bool (*)(const char* path, void* archive, void* entry);
 		lookup_t original_lookup = nullptr;
 
+		bool tracing = false; // [Debug] LogFiles: log the archive lookups too, under the names mods use
+
 		bool lookup(const char* path, void* archive, void* entry)
 		{
 			if (mod_loader::provides(path))
 			{
 				return false; // the game opens the loose file instead, and the mod loader hands it the mod's
 			}
-			return original_lookup(path, archive, entry);
+			const bool found = original_lookup(path, archive, entry);
+			if (tracing && path)
+			{
+				logger::write("files: %s %s", found ? "from the archives:" : "not in the archives:", path);
+			}
+			return found;
 		}
 
 		// Executable memory within a rel32 call's reach of `site`.
@@ -196,8 +203,9 @@ namespace loose_first
 		}
 	}
 
-	void install()
+	void install(const bool trace)
 	{
+		tracing = trace;
 		wchar_t exe[MAX_PATH]{};
 		const std::wstring_view path(exe, GetModuleFileNameW(nullptr, exe, MAX_PATH));
 		const auto slash = path.find_last_of(L"\\/");

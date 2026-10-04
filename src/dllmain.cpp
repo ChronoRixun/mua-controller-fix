@@ -18,10 +18,10 @@ BOOL WINAPI DllMain(HINSTANCE instance, const DWORD reason, LPVOID)
 		// loose_first.hpp makes the game use a mod's copy of a file it keeps in its .bin archives
 		// (models, textures, data), where it would otherwise never ask Windows for the file.
 		const auto ini = (logger::module_dir() / L"mua-controller-fix.ini").wstring();
-		if (mod_loader::install({nullptr, "bink2w64.dll", "fmodex64.dll", "fmod_event64.dll"},
-		                        GetPrivateProfileIntW(L"Debug", L"LogFiles", 0, ini.c_str()) != 0))
+		const bool log_files = GetPrivateProfileIntW(L"Debug", L"LogFiles", 0, ini.c_str()) != 0;
+		if (mod_loader::install({nullptr, "bink2w64.dll", "fmodex64.dll", "fmod_event64.dll"}, log_files))
 		{
-			loose_first::install();
+			loose_first::install(log_files);
 		}
 
 		steam_presence::install();
