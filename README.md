@@ -44,7 +44,7 @@ It also shows what you're playing on **Discord**: the area and your hero, taken 
 
 ## 🎮 Compatibility
 
-**Games:** the 2016 PC releases of *Marvel: Ultimate Alliance* and *Marvel: Ultimate Alliance 2*: the 64-bit versions that were sold on Steam. (The 2006 PC release of the first game is a different, 32-bit program and isn't supported.)
+**Games:** the 2016 PC releases of *Marvel: Ultimate Alliance* and *Marvel: Ultimate Alliance 2*: the 64-bit versions that were sold on Steam. (The 2006 PC release of the first game is a different, 32-bit program and isn't supported here; for it, see [MUA Classic Fix](https://github.com/ChronoRixun/muac-fix).)
 
 **Controllers:**
 
